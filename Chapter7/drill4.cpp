@@ -1,15 +1,18 @@
 #include"std_lib_facilities.h"
+#include<ctype.h>
 using namespace std;
 
 
 const char number = '8'; // t.kind == number means that t is a number Token
-const char quit = 'q';   // t.kind == quit means that t is quit Tokem
+const char quit = 'q';   // t.kind == quit means that t is quit Token
+const char help = 'h';
 const char print = ';';  // t.kind == print means that t is print Token
 const string prompt = ">"; 
 const string result = "="; // used to indicate that what follows is a result 
 const char name = 'a';     // name token
 const char let = 'L';      //declaration token
 const string declkey="let"; // declaration keyword
+
 
 class Token {
 public:
@@ -56,6 +59,16 @@ public:
     }
 };
 
+class Symbol_table{
+public:
+    vector<Variable> var_table;
+    double get(string s);
+    void set(string s, double d);
+    bool is_declared(string var);
+    double define_name(string var, double val);
+};
+
+
 // constructor
 Token_stream::Token_stream(): full(false), buffer(0)
 {    
@@ -80,6 +93,7 @@ Token Token_stream::get(){
 
     switch(ch){
         case print:
+        case help:
         case quit:
         case '(':
         case ')':
@@ -90,7 +104,9 @@ Token Token_stream::get(){
         case '%':
         case '=':
             return Token(ch);  // let each character represent itself
-
+        case '\n':
+        case ' ':
+            return Token(print);
         case '.':              // a floatinf point literal can start with .
         case '0':
         case '1':
@@ -142,18 +158,8 @@ void Token_stream::ignore(char c){
 }
 
 Token_stream ts;
-//vector<Variable> var_table;
 Symbol_table symbol_table;
 double expression();
-
-class Symbol_table{
-public:
-    vector<Variable> var_table;
-    double get(string s);
-    void set(string s, double d);
-    bool is_declared(string var);
-    double define_name(string var, double val);
-};
 
 
 double Symbol_table::get(string s){
@@ -192,35 +198,12 @@ bool Symbol_table::is_declared(string var){
 double Symbol_table::define_name(string var, double val){
     // add(var, val) to var_table
     if(is_declared(var)){
-        error(var, "declared twice");
+        error(var, " declared twice");
     }
     var_table.push_back(Variable(var, val));
     return val;
 }
 
-
-// double get_value(string s){
-//     // return the value of the Variable names s
-
-//     for(int i=0; i<var_table.size(); i++){
-//         if (var_table[i].name == s){
-//             return var_table[i].value;
-//         }
-//     }
-//     error("get: undefined variable", s);
-// }
-
-// void set_value(string s, double d){
-//     // set variable named s to d
-
-//     for(int i=0; i<var_table.size(); i++){
-//         if(var_table[i].name == s){
-//             var_table[i].value = d;
-//             return;
-//         }
-//     }
-//     error("set: undefined variable, ", s);
-// }
 
 double primary(){
     Token t = ts.get();
@@ -303,25 +286,6 @@ double expression(){
     }
 }
 
-// bool is_declared(string var){
-//     // is var already in var_table
-//     for(int i=0; i<var_table.size(); i++){
-//         if (var_table[i].name == var){
-//             return true;
-//         }
-//     }
-//     return false;
-// }
-
-// double define_name(string var, double val){
-//     // add(var, val) to var_table
-//     if(is_declared(var)){
-//         error(var, "declared twice");
-//     }
-//     var_table.push_back(Variable(var, val));
-//     return val;
-// }
-
 void clean_up_mess(){
     ts.ignore(print);
 }
@@ -369,7 +333,6 @@ double assignment(){
 
 }
 
-
 double statement(){
     Token t = ts.get();
     switch(t.kind){
@@ -396,6 +359,9 @@ void calculate(){
             if(t.kind == quit){                    // quit
                 return;
             }
+            else if(t.kind == help){
+                cout<<"Using calculator."<<endl;
+            }
             ts.putback(t);
             cout<<result<<statement()<<endl;
         }
@@ -416,8 +382,8 @@ int main(){
     
     try{
         // predefined names;
-        define_name("pi", 3.1415926535);
-        define_name("e", 2.7182818284);
+        symbol_table.define_name("pi", 3.1415926535);
+        symbol_table.define_name("e", 2.7182818284);
 
         calculate();
         keep_window_open();

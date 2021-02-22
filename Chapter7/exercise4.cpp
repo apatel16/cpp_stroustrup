@@ -1,15 +1,18 @@
 #include"std_lib_facilities.h"
+#include<ctype.h>
 using namespace std;
 
 
 const char number = '8'; // t.kind == number means that t is a number Token
-const char quit = 'q';   // t.kind == quit means that t is quit Tokem
+const char quit = 'q';   // t.kind == quit means that t is quit Token
+const char help = 'h';
 const char print = ';';  // t.kind == print means that t is print Token
 const string prompt = ">"; 
 const string result = "="; // used to indicate that what follows is a result 
 const char name = 'a';     // name token
 const char let = 'L';      //declaration token
 const string declkey="let"; // declaration keyword
+
 
 class Token {
 public:
@@ -56,6 +59,16 @@ public:
     }
 };
 
+class Symbol_table{
+public:
+    vector<Variable> var_table;
+    double get(string s);
+    void set(string s, double d);
+    bool is_declared(string var);
+    double define_name(string var, double val);
+};
+
+
 // constructor
 Token_stream::Token_stream(): full(false), buffer(0)
 {    
@@ -80,6 +93,7 @@ Token Token_stream::get(){
 
     switch(ch){
         case print:
+        case help:
         case quit:
         case '(':
         case ')':
@@ -90,7 +104,9 @@ Token Token_stream::get(){
         case '%':
         case '=':
             return Token(ch);  // let each character represent itself
-
+        case '\n':
+        case ' ':
+            return Token(print);
         case '.':              // a floatinf point literal can start with .
         case '0':
         case '1':
@@ -141,19 +157,8 @@ void Token_stream::ignore(char c){
     }
 }
 
-Token_stream ts;
-//vector<Variable> var_table;
 Symbol_table symbol_table;
-double expression();
-
-class Symbol_table{
-public:
-    vector<Variable> var_table;
-    double get(string s);
-    void set(string s, double d);
-    bool is_declared(string var);
-    double define_name(string var, double val);
-};
+double expression(Token_stream &ts);
 
 
 double Symbol_table::get(string s){
@@ -192,42 +197,19 @@ bool Symbol_table::is_declared(string var){
 double Symbol_table::define_name(string var, double val){
     // add(var, val) to var_table
     if(is_declared(var)){
-        error(var, "declared twice");
+        error(var, " declared twice");
     }
     var_table.push_back(Variable(var, val));
     return val;
 }
 
 
-// double get_value(string s){
-//     // return the value of the Variable names s
-
-//     for(int i=0; i<var_table.size(); i++){
-//         if (var_table[i].name == s){
-//             return var_table[i].value;
-//         }
-//     }
-//     error("get: undefined variable", s);
-// }
-
-// void set_value(string s, double d){
-//     // set variable named s to d
-
-//     for(int i=0; i<var_table.size(); i++){
-//         if(var_table[i].name == s){
-//             var_table[i].value = d;
-//             return;
-//         }
-//     }
-//     error("set: undefined variable, ", s);
-// }
-
-double primary(){
+double primary(Token_stream &ts){
     Token t = ts.get();
     switch(t.kind){
         case '(':
         {
-            double d = expression();
+            double d = expression(ts);
             t = ts.get();
             if(t.kind != ')') error("')' expected." );
             return d;
@@ -235,9 +217,9 @@ double primary(){
         case number:
             return t.value;
         case '-':
-            return - primary();
+            return - primary(ts);
         case '+':
-            return primary();
+            return primary(ts);
         case 'a':
             return symbol_table.get(t.name);
         default:
@@ -245,19 +227,19 @@ double primary(){
     }
 }
 
-double term(){
-    double left = primary();
+double term(Token_stream &ts){
+    double left = primary(ts);
     Token t = ts.get();
     while(true){
         switch(t.kind){
             case '*':
-                left *= primary();
+                left *= primary(ts);
                 t = ts.get();
                 break;
 
             case '/':
             {
-                double d = primary();
+                double d = primary(ts);
                 if(d == 0) error("divide by zero");
                 left /= d;
                 t = ts.get();
@@ -265,7 +247,7 @@ double term(){
             }
             case '%':
             {
-                double d = term();
+                double d = term(ts);
                 int i1 = int(left);
                 if (i1 != left) error("left-hand operand of % not int");
                 int i2 = int(d);
@@ -282,18 +264,18 @@ double term(){
     }
 }
 
-double expression(){
+double expression(Token_stream &ts){
 
-    double left = term();
+    double left = term(ts);
     Token t = ts.get();
     while(true){
         switch(t.kind){
             case '+':
-                left += term();
+                left += term(ts);
                 t = ts.get();
                 break;
             case '-':
-                left -= term();
+                left -= term(ts);
                 t = ts.get();
                 break;
             default:
@@ -303,30 +285,11 @@ double expression(){
     }
 }
 
-// bool is_declared(string var){
-//     // is var already in var_table
-//     for(int i=0; i<var_table.size(); i++){
-//         if (var_table[i].name == var){
-//             return true;
-//         }
-//     }
-//     return false;
-// }
-
-// double define_name(string var, double val){
-//     // add(var, val) to var_table
-//     if(is_declared(var)){
-//         error(var, "declared twice");
-//     }
-//     var_table.push_back(Variable(var, val));
-//     return val;
-// }
-
-void clean_up_mess(){
+void clean_up_mess(Token_stream &ts){
     ts.ignore(print);
 }
 
-double declaration(){
+double declaration(Token_stream &ts){
     // assume we have seen "let"
     // handle: name = expression
     // declare a variable called name with the initial value expression
@@ -342,12 +305,12 @@ double declaration(){
         error ("= missing in declaration of, ", var_name);
     }
 
-    double d = expression();
+    double d = expression(ts);
     symbol_table.define_name(var_name, d);
     return d;
 }
 
-double assignment(){
+double assignment(Token_stream &ts){
     // Assign value to variable after initialization
     // New function added for exercise 2
     Token t = ts.get();
@@ -361,7 +324,7 @@ double assignment(){
         error("Expected an expression or semicolon...");
     }
     else if (t2.kind == '='){
-        double d = expression();
+        double d = expression(ts);
         symbol_table.set(var_name, d);
         return d;
     }
@@ -369,24 +332,23 @@ double assignment(){
 
 }
 
-
-double statement(){
+double statement(Token_stream &ts){
     Token t = ts.get();
     switch(t.kind){
         case let:   // declare new variable
-            return declaration();
+            return declaration(ts);
         case name:  // assign new value to variable or print variable;
         {   
             ts.putback(t);
-            return assignment();
+            return assignment(ts);
         }
         default:
             ts.putback(t);
-            return expression();
+            return expression(ts);
     }
 }
 
-void calculate(){
+void calculate(Token_stream &ts){
     while(cin){
         try{
             cout<<prompt;
@@ -396,12 +358,15 @@ void calculate(){
             if(t.kind == quit){                    // quit
                 return;
             }
+            else if(t.kind == help){
+                cout<<"Using calculator."<<endl;
+            }
             ts.putback(t);
-            cout<<result<<statement()<<endl;
+            cout<<result<<statement(ts)<<endl;
         }
         catch(exception& e){
             cerr<<e.what()<<endl;
-            clean_up_mess();
+            clean_up_mess(ts);
         }
     }
 }
@@ -414,12 +379,14 @@ int main(){
     cout<<"== Note: Please enter expressions using floating-point numbers."<<endl;
     cout<<"============================================================"<<endl;
     
+    Token_stream ts;
+
     try{
         // predefined names;
-        define_name("pi", 3.1415926535);
-        define_name("e", 2.7182818284);
+        symbol_table.define_name("pi", 3.1415926535);
+        symbol_table.define_name("e", 2.7182818284);
 
-        calculate();
+        calculate(ts);
         keep_window_open();
 
         return 0;
