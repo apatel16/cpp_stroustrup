@@ -1,16 +1,22 @@
-// Version 3 : Keep details private
+// Version 4 : Month day argument passing resolve using enum
+// But it caused add_day function to not be able to increase month
 
 #include<iostream>
 using namespace std;
 
 class Date{
-    int y;
-    int m;
-    int d;
 public:
-    Date(int y, int m, int d);
+    enum Month{
+        jan=1, feb, mar, apr, may, jun, jul, aug, sep, oct, nov, dec
+    };
+
+    Date(int y, Month m, int d);
     void add_day(int day);
     void show_date();
+private:
+    int y;
+    Month m;
+    int d;
 };
 
 void Date::add_day(int day){
@@ -33,13 +39,13 @@ void Date::add_day(int day){
         temp2 = temp2 - days_in_month[i];
         temp3 = i;
     }
-
-    m = temp3 + 2;
+    
+    m = Date::Month(temp3 + 2); // casting integer to our enum type
     d = temp2;
 }
 
 
-Date::Date(int year, int month, int day){
+Date::Date(int year, Month month, int day){
     
     if(month < 1 || month > 12){
         cout<<"Invalid month "<<endl;
@@ -64,17 +70,18 @@ void Date::show_date(){
 
 int main(void)
 {
-    Date today(1978, 6, 25);
+    Date today(1978, Date::jun, 25);
+    today.show_date();
+
+    today.add_day(10);
     today.show_date();
 
     Date tomorrow = today;
     tomorrow.show_date();
 
     std::cout<<"Checking for date invariance"<<endl;
-    Date last(2004, 13, -5);
+    Date last(2004, Date::feb, -5);
     last.show_date();
-
-    today.d = 10; // This will give error
 
     return 0;
 }
